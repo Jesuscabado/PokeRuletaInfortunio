@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ruleta del Infortunio</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Ruleta de Presentaciones Pokémon</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div class="header">
-      <div class="botones-top">
+        <div class="botones-top">
             <button id="btnGirar" class="btn-girar" onclick="iniciarGiro()">Girar Ruleta</button>
             <button id="btnEditar" onclick="mostrarModal('modalEditar')">Participantes</button>
             <button id="btnOpciones" onclick="mostrarModal('modalOpciones')">Opciones</button>
@@ -42,12 +42,14 @@
     <div id="modalOpciones" class="modal-overlay">
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-titulo">Opciones de la Ruleta</div>
+            
             <div style="text-align:center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #eee;">
                 <label><b>Número de Grupos a formar:</b> 
                     <input type="number" id="numGrupos" value="0" min="0" max="10" style="width: 50px; text-align:center; padding: 5px;" onchange="inicializarGrupos()">
                 </label>
                 <p style="font-size: 12px; color: gray; margin-top: 5px;">Aviso: Pon '0' para presentaciones individuales sin grupos.</p>
             </div>
+
             <div class="modal-titulo" style="font-size: 16px;">Filtros de Pokémon</div>
             <div class="opciones-grid" id="opcionesGens"></div>
             <div class="opciones-extra">
@@ -62,9 +64,9 @@
 
     <div id="modalHistorial" class="modal-overlay">
         <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-titulo">Historial de Pokémon</div>
+            <div class="modal-titulo">Historial de Asignaciones</div>
             <div id="listaHistorial">Aún no hay registros.</div>
-            <div style="text-align:center; margin-top:15px;">
+            <div style="text-align:center; margin-top: 10px;">
                 <button onclick="cerrarModal('modalHistorial')">Cerrar</button>
             </div>
         </div>
@@ -75,10 +77,10 @@
             <div class="res-nombre" id="resNombre">A PRESENTAR: Nombre</div>
             <div class="res-poke" id="resPoke">¡Te acompaña Pokemon!</div>
             <img id="resImg" src="" alt="Pokemon">
-            <div class="res-hint">(Haz clic aquí para continuar)</div>
+            <div class="res-hint">(Haz clic en cualquier parte para continuar)</div>
         </div>
     </div>
 
-    <script src="script.js?v=2.0"></script>
+    <script src="script.js?v=3.0"></script>
 </body>
 </html>

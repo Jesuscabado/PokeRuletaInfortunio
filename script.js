@@ -18,15 +18,15 @@ const rangos_generaciones = {
 let participantes_base = [];       // Lista Maestra de la clase (LocalStorage)
 let participantes_pendientes = []; // Lista de los que faltan por presentar hoy (SessionStorage)
 let participantes_activos = [];    // Los que se dibujan en la ruleta
-let historialNombres = new Set();
-let historialUI = [];
+let historialNombres = new Set();  // Pokémon que ya han salido
+let historialUI = [];              // Textos del historial
 let cacheIconos = {}; 
 
 let anguloActual = 0;
 let girando = false;
 let ganadorActual = null;
 
-let cantidadGrupos = 4;
+let cantidadGrupos = 0;
 let indiceGrupoActual = 0;
 let miembrosGrupos = [];
 
@@ -40,6 +40,7 @@ const radio = 270;
 function inicializarUI() {
     cargarDesdeStorage();
 
+    // 1. Generar Editor
     let editorHTML = "";
     for (let i = 0; i < 18; i++) {
         editorHTML += `
@@ -52,6 +53,7 @@ function inicializarUI() {
     }
     document.getElementById("editorContainer").innerHTML = editorHTML;
 
+    // 2. Generar Opciones
     let opcionesHTML = `
         <div class="botones-gens">
             <button class="btn-small" onclick="toggleGeneraciones(true)">Todas</button>
@@ -62,33 +64,67 @@ function inicializarUI() {
     }
     document.getElementById("opcionesGens").innerHTML = opcionesHTML;
     
-    inicializarGrupos();
+    // 3. Restaurar UI visual desde la memoria
+    document.getElementById('numGrupos').value = cantidadGrupos; // Restaurar input numérico
+    
+    const contenedor = document.getElementById('contenedorGrupos');
+    if (cantidadGrupos > 0) {
+        if (miembrosGrupos.length === 0) miembrosGrupos = Array.from({length: cantidadGrupos}, () => []);
+        contenedor.style.display = "flex"; 
+        renderizarGrupos();
+    } else {
+        contenedor.style.display = "none";
+    }
+
+    if (historialUI.length > 0) {
+        let listHTML = historialUI.map(t => `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">${t}</div>`).join('');
+        document.getElementById("listaHistorial").innerHTML = listHTML;
+    }
+
     prepararDatos();
 }
 
 function cargarDesdeStorage() {
-    // 1. Cargar la Lista Maestra de LocalStorage
+    // Lista Maestra
     const guardados = localStorage.getItem('ruleta_participantes');
     if (guardados) {
-        try {
-            participantes_base = JSON.parse(guardados);
-        } catch(e) {
-            participantes_base = [];
-        }
+        try { participantes_base = JSON.parse(guardados); } catch(e) { participantes_base = []; }
     }
 
-    // 2. Cargar los Pendientes de la sesión actual (SessionStorage)
+    // Pendientes
     const pendientes = sessionStorage.getItem('ruleta_pendientes');
     if (pendientes) {
-        try {
-            participantes_pendientes = JSON.parse(pendientes);
-        } catch(e) {
-            participantes_pendientes = [...participantes_base];
-        }
+        try { participantes_pendientes = JSON.parse(pendientes); } catch(e) { participantes_pendientes = [...participantes_base]; }
     } else {
-        // Si no hay sesión activa, los pendientes son todos los de la base
         participantes_pendientes = [...participantes_base];
     }
+
+    // Historial
+    const histUI = sessionStorage.getItem('ruleta_historialUI');
+    if (histUI) historialUI = JSON.parse(histUI);
+
+    const histN = sessionStorage.getItem('ruleta_historialNombres');
+    if (histN) historialNombres = new Set(JSON.parse(histN));
+
+    // Grupos
+    const nGrupos = sessionStorage.getItem('ruleta_numGrupos');
+    if (nGrupos !== null) cantidadGrupos = parseInt(nGrupos);
+
+    const idxGrupo = sessionStorage.getItem('ruleta_grupoIndex');
+    if (idxGrupo !== null) indiceGrupoActual = parseInt(idxGrupo);
+
+    const mGrupos = sessionStorage.getItem('ruleta_grupos');
+    if (mGrupos) miembrosGrupos = JSON.parse(mGrupos);
+}
+
+// Nueva función centralizada para guardar TODA la sesión
+function guardarEstadoSesion() {
+    sessionStorage.setItem('ruleta_pendientes', JSON.stringify(participantes_pendientes));
+    sessionStorage.setItem('ruleta_historialUI', JSON.stringify(historialUI));
+    sessionStorage.setItem('ruleta_historialNombres', JSON.stringify([...historialNombres])); // Set a Array
+    sessionStorage.setItem('ruleta_numGrupos', cantidadGrupos.toString());
+    sessionStorage.setItem('ruleta_grupoIndex', indiceGrupoActual.toString());
+    sessionStorage.setItem('ruleta_grupos', JSON.stringify(miembrosGrupos));
 }
 
 // --- GRUPOS Y OPCIONES ---
@@ -115,6 +151,7 @@ function inicializarGrupos() {
         contenedor.style.display = "none"; 
         contenedor.innerHTML = "";
     }
+    guardarEstadoSesion(); // Guardar si el usuario cambia los grupos
 }
 
 function renderizarGrupos() {
@@ -136,7 +173,6 @@ function renderizarGrupos() {
 function prepararDatos() {
     participantes_activos = [];
     
-    // Si no quedan participantes pendientes, avisamos
     if (participantes_pendientes.length === 0) {
         if (participantes_base.length > 0) {
             document.getElementById("estado").innerText = "¡Todos han participado! Reinicia la sesión.";
@@ -155,7 +191,6 @@ function prepararDatos() {
 
     let promesasImagenes = [];
 
-    // Usamos la lista PENDIENTES para la ruleta
     participantes_pendientes.forEach((p, i) => {
         let pClon = {...p};
         pClon.type_id = tiposDisponibles[i];
@@ -351,7 +386,7 @@ async function buscarPokemonGanador() {
 
         let nombreFormateado = datosPoke.name.charAt(0).toUpperCase() + datosPoke.name.slice(1).replace(/-/g, " ");
 
-        // --- ASIGNACIÓN (GRUPOS O INDIVIDUAL) ---
+        // --- ASIGNACIÓN ---
         let textoHistorial = "";
         let textoResultado = "";
 
@@ -383,9 +418,9 @@ async function buscarPokemonGanador() {
         
         document.getElementById("modalResultado").style.display = "flex";
 
-        // ELIMINAR SOLO DE LA LISTA PENDIENTE DE HOY
+        // ELIMINAR DE PENDIENTES Y GUARDAR ESTADO COMPLETO
         participantes_pendientes = participantes_pendientes.filter(p => p.nombre !== ganadorActual.nombre);
-        sessionStorage.setItem('ruleta_pendientes', JSON.stringify(participantes_pendientes));
+        guardarEstadoSesion(); // <--- Aquí guardamos todo para que sobreviva a F5
 
     } catch (error) {
         document.getElementById("estado").innerText = "(Error conectando a PokeAPI)";
@@ -420,7 +455,6 @@ function estadoBotones(desactivar) {
 }
 
 function cargarEditorDesdeBase() {
-    // El editor SIEMPRE muestra a toda la clase (la lista base)
     for (let i = 0; i < 18; i++) {
         let iptNom = document.getElementById(`editNom_${i}`);
         let iptBias = document.getElementById(`editBias_${i}`);
@@ -446,13 +480,12 @@ function guardarParticipantes() {
         }
     }
     
-    // Al guardar, se actualiza la base permanente (toda la clase)
     participantes_base = nuevaBase;
     localStorage.setItem('ruleta_participantes', JSON.stringify(participantes_base));
     
-    // Al añadir o editar, reiniciamos la ruleta para incluir a todos los de la base
+    // Si editamos alumnos, reiniciamos la ruleta por seguridad
     participantes_pendientes = [...participantes_base];
-    sessionStorage.setItem('ruleta_pendientes', JSON.stringify(participantes_pendientes));
+    guardarEstadoSesion();
     
     cerrarModal('modalEditar');
     prepararDatos();
@@ -463,25 +496,29 @@ function borrarParticipantes() {
     if (confirm("¿Estás seguro de que quieres borrar a todos los participantes para empezar una clase nueva?")) {
         participantes_base = [];
         participantes_pendientes = [];
+        historialNombres.clear();
+        historialUI = [];
+        
         localStorage.removeItem('ruleta_participantes');
-        sessionStorage.removeItem('ruleta_pendientes');
+        sessionStorage.clear(); // Limpiamos todo el rastro
+        
+        document.getElementById("listaHistorial").innerHTML = "Aún no hay registros.";
+        inicializarGrupos();
         cargarEditorDesdeBase(); 
+        prepararDatos();
     }
 }
 
 function reiniciarSesion() {
     if (confirm("¿Quieres reiniciar los grupos y la ruleta para volver a sortear con esta misma clase?")) {
-        // Limpiar Historial
         historialNombres.clear();
         historialUI = [];
         document.getElementById("listaHistorial").innerHTML = "Aún no hay registros.";
         
-        // Limpiar Grupos
-        inicializarGrupos();
+        inicializarGrupos(); // Esto borra las tarjetas visuales
         
-        // Volver a llenar la lista de pendientes con todos los alumnos de la base
         participantes_pendientes = [...participantes_base];
-        sessionStorage.setItem('ruleta_pendientes', JSON.stringify(participantes_pendientes));
+        guardarEstadoSesion(); // Guardamos el estado limpio
         
         prepararDatos();
         document.getElementById("estado").innerText = "¡Sesión reiniciada! Todo listo para empezar.";
